@@ -22,7 +22,7 @@
 点击页面右上角的 `Fork` 按钮，将本项目复制到你的账号下；或者直接新建一个私有/公开仓库，并上传 `main.py`。
 
 #### 2. 申请 API Key
-本项目的数据源由 [Entropy-Increase-Team](https://github.com/Entropy-Increase-Team/astrbot_plugin_rocom) 提供。
+本项目的数据源由 [Entropy-Increase-Team](https://github.com/Entropy-Increase-Team/) 提供。
 你需要前往该项目主页或相关社区，获取用于调用 WeGame 接口的 `ROCOM_API_KEY`。
 
 #### 3. 配置 GitHub Secrets (核心步骤)
@@ -49,7 +49,7 @@
 由于 GitHub 官方的 Cron 触发存在排队延迟（可能延迟 5-30 分钟），追求极致准时的玩家可以：
 1.  在 [cron-job.org](https://cron-job.org/) 创建任务。
 2.  配置 POST 请求通过 GitHub API 远程触发本项目的 `workflow_dispatch`。
-3.  详细教程可参考 [这篇博客/说明]。
+3.  详细教程可参考 [新闻联播文字稿自动化推送系统](https://github.com/ALLCAPS-Droid/xin-wen-lian-bo)。
 
 ---
 
