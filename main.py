@@ -1,73 +1,72 @@
 import os
 import requests
 
-# 洛克王国数据网关 (熵增项目组端点)
+# 1. 基础配置
+# 洛克王国数据网关 (由 Entropy-Increase-Team 提供)
 API_URL = "https://wegame.shallow.ink/api/v1/games/rocom/merchant/info?refresh=true"
+# NotifyMe 新版官方服务器地址
+NOTIFYME_SERVER = "https://notifyme-server.wzn556.top/api/send"
 
+# 2. 从环境变量读取敏感配置 (GitHub Secrets)
 ROCOM_API_KEY = os.environ.get("ROCOM_API_KEY")
 NOTIFYME_UUID = os.environ.get("NOTIFYME_UUID")
-
-# 新版 NotifyMe 官方服务端地址
-NOTIFYME_SERVER_URL = "https://notifyme-server.wzn556.top/api/send"
+BARK_KEY = os.environ.get("BARK_KEY")
 
 def get_merchant_data():
+    """从 API 获取商人售卖数据"""
     if not ROCOM_API_KEY:
-        return None, "错误：未检测到 ROCOM_API_KEY 环境变量"
-        
+        return None, None, None, "错误：环境变量中未配置 ROCOM_API_KEY"
+    
+    headers = {"X-API-Key": ROCOM_API_KEY}
+    
     try:
-        # 这里的 headers 就是出示通行证的关键！
-        headers = {
-            "X-API-Key": ROCOM_API_KEY
-        }
-        
-        # 发送请求时带上 headers
-        response = requests.get(API_URL, headers=headers, timeout=10)
+        response = requests.get(API_URL, headers=headers, timeout=15)
         response.raise_for_status()
         res_json = response.json()
         
         if res_json.get("code") != 0:
-            return None, f"接口返回错误: {res_json.get('message', '未知错误')}"
+            return None, None, None, f"接口返回错误: {res_json.get('message', '未知错误')}"
             
         data = res_json.get("data", {})
         activities = data.get("merchantActivities") or data.get("merchant_activities") or []
         
         if not activities:
-            return None, "当前暂无远行商人数据"
+            return None, None, None, "当前暂无远行商人数据"
             
         activity = activities[0]
         props = activity.get("get_props", [])
         pets = activity.get("get_pets", [])
+        items = props + pets
         
-        if not props and not pets:
-            return None, "当前轮次商人没有携带任何商品"
+        if not items:
+            return None, None, None, "当前轮次商人没有携带任何商品"
         
-        # 提取商品纯文本名称（用于在手机通知栏简略显示）
-        item_names = [item.get("name", "未知") for item in props + pets]
-        body_text = f"当前售卖: {'、'.join(item_names)}"
+        # --- 数据加工 ---
+        # 提取商品纯文本列表 (用于通知栏摘要)
+        item_names = [i.get("name", "未知") for i in items]
+        body_summary = f"当前售卖: {'、'.join(item_names)}"
         
-        # 拼接 Markdown 格式的内容（用于在 App 内完美渲染图片）
-        content_md = "### 🛒 当前售卖道具与精灵\n\n---\n\n"
-        for item in props + pets:
-            name = item.get("name", "未知商品")
-            icon_url = item.get("icon_url", "")
-            content_md += f"![{name}]({icon_url}) **{name}**\n\n"
+        # 拼接 Markdown 格式 (用于 NotifyMe 详情展示)
+        content_md = "### 🛒 洛克王国：远行商人已刷新\n\n---\n\n"
+        for i in items:
+            name = i.get("name", "未知")
+            icon = i.get("icon_url", "")
+            content_md += f"![{name}]({icon}) **{name}**\n\n"
+        
+        # 提取第一个商品的图片 (用于 Bark 的图标/大图预览)
+        first_icon = items[0].get("icon_url") if items else ""
             
-        return body_text, content_md
+        return body_summary, content_md, first_icon, None
 
     except Exception as e:
-        return None, f"获取商人数据失败: {e}"
+        return None, None, None, f"获取数据异常: {e}"
 
-def push_via_notifyme(body_text, markdown_text):
-    if body_text is None:
-        title = "⚠️ 远行商人监控异常"
-        body = markdown_text 
-        md = markdown_text
-    else:
-        title = "📢 洛克王国：远行商人已刷新"
-        body = body_text
-        md = markdown_text
-
-    # NotifyMe 请求体配置
+def push_via_notifyme(title, body, md):
+    """通过 NotifyMe 推送 (适配新版 UUID 协议)"""
+    if not NOTIFYME_UUID:
+        print("未配置 NOTIFYME_UUID，跳过此通道")
+        return
+        
     payload = {
         "data": {
             "uuid": NOTIFYME_UUID,
@@ -75,29 +74,58 @@ def push_via_notifyme(body_text, markdown_text):
             "priority": "high",
             "data": {
                 "title": title,
-                "body": body,        
-                "markdown": md,      
-                "group": "洛克王国",  
-                "bigText": True,     
-                "record": 1          
+                "body": body,
+                "markdown": md,
+                "group": "洛克王国",
+                "bigText": True,
+                "record": 1
             }
         }
     }
     
-    # NotifyMe 需要的 Content-Type 请求头
-    headers = {
-        "Content-Type": "application/json"
+    try:
+        res = requests.post(NOTIFYME_SERVER, json=payload, headers={"Content-Type": "application/json"})
+        print(f"NotifyMe 状态: {res.status_code}, {res.text}")
+    except Exception as e:
+        print(f"NotifyMe 推送异常: {e}")
+
+def push_via_bark(title, body, icon_url):
+    """通过 Bark 推送 (iOS 专用)"""
+    if not BARK_KEY:
+        print("未配置 BARK_KEY，跳过此通道")
+        return
+        
+    bark_url = f"https://api.day.app/{BARK_KEY}"
+    payload = {
+        "title": title,
+        "body": body,
+        "group": "洛克王国",
+        "icon": icon_url,      # 设置通知左侧的小图标
+        "image": icon_url,     # 在通知右侧显示大图预览
+        "isArchive": 1         # 自动保存到历史记录
     }
     
     try:
-        res = requests.post(NOTIFYME_SERVER_URL, json=payload, headers=headers)
-        if res.status_code == 200:
-            print("NotifyMe 新版 API 推送成功！")
-        else:
-            print(f"推送失败，状态码: {res.status_code}, 返回内容: {res.text}")
+        res = requests.post(bark_url, json=payload)
+        print(f"Bark 状态: {res.status_code}, {res.text}")
     except Exception as e:
-        print(f"推送请求异常: {e}")
+        print(f"Bark 推送异常: {e}")
 
 if __name__ == "__main__":
-    b_text, md_text = get_merchant_data()
-    push_via_notifyme(b_text, md_text)
+    summary, markdown, icon, error = get_merchant_data()
+    
+    if error:
+        push_title = "⚠️ 远行商人监控异常"
+        push_body = error
+        push_md = f"**错误详情：**\n{error}"
+    else:
+        push_title = "📢 远行商人已刷新"
+        push_body = summary
+        push_md = markdown
+
+    # 并行推送：根据 Secret 配置自动选择通道
+    if NOTIFYME_UUID:
+        push_via_notifyme(push_title, push_body, push_md)
+        
+    if BARK_KEY:
+        push_via_bark(push_title, push_body, icon)
