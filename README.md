@@ -4,7 +4,7 @@
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
 ![Actions](https://img.shields.io/badge/GitHub-Actions-orange)
 
-这是一个基于 **GitHub Actions** 的轻量化自动化工具，专门用于监控《洛克王国世界》中“远行商人”的刷新状态。每当商人带着稀有道具或精灵刷新时，系统会自动抓取图文数据，并精准推送到你的手机（支持 iOS 和 Android）。
+这是一个基于 **GitHub Actions** 的轻量化自动化工具，专门用于监控《洛克王国世界》中“远行商人”的刷新状态。每当商人带着道具刷新时，系统会自动抓取图文数据，并精准推送到你的手机（支持 iOS 和 Android）。
 
 ### ✨ 特性
 
@@ -74,5 +74,3 @@
 
 * 数据接口及原始前端 UI 模板设计来自：[Entropy-Increase-Team/astrbot_plugin_rocom](https://github.com/Entropy-Increase-Team/astrbot_plugin_rocom)
 ```
-
-***
