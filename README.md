@@ -73,4 +73,3 @@
 ## 🙏 鸣谢
 
 * 数据接口及原始前端 UI 模板设计来自：[Entropy-Increase-Team/astrbot_plugin_rocom](https://github.com/Entropy-Increase-Team/astrbot_plugin_rocom)
-```
