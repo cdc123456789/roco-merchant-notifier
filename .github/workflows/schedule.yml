@@ -25,4 +25,8 @@ jobs:
         run: pip install requests
 
       - name: Run Notifier Script
+        env:
+          # 从 GitHub Secrets 中读取并映射为环境变量
+          ROCOM_API_KEY: ${{ secrets.ROCOM_API_KEY }}
+          NOTIFYME_UUID: ${{ secrets.NOTIFYME_UUID }}
         run: python main.py
