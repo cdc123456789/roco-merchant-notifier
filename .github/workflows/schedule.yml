@@ -2,11 +2,10 @@ name: Roco Merchant Notifier
 
 on:
   schedule:
-    # 每天北京时间 08:00, 12:00, 16:00, 20:00 商人刷新
-    # GitHub 使用 UTC 时间 (北京时间减 8 小时)
-    # 为对抗 GitHub Actions 的排队延迟，设定提前 5 分钟触发排队 (即 55 分)
+    # 北京时间 08:00, 12:00, 16:00, 20:00 刷新
+    # 提前 5 分钟进入排队队列，对抗 GitHub 延迟
     - cron: '55 23,3,7,11 * * *'
-  workflow_dispatch: # 允许在 GitHub 网页端手动点击运行
+  workflow_dispatch: 
 
 jobs:
   run-notifier:
@@ -23,16 +22,14 @@ jobs:
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install requests playwright
+          pip install requests playwright jinja2
 
       - name: Install Playwright Browsers & OS Dependencies
-        # 这是生成图片最核心的一步，安装 Chromium 浏览器和运行所需的系统依赖
         run: |
           playwright install chromium --with-deps
 
       - name: Run Notifier Script
         env:
-          # 从 GitHub Secrets 中读取敏感的 Key，映射为环境变量供 main.py 使用
           ROCOM_API_KEY: ${{ secrets.ROCOM_API_KEY }}
           IMGBB_KEY: ${{ secrets.IMGBB_KEY }}
           NOTIFYME_UUID: ${{ secrets.NOTIFYME_UUID }}
