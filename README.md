@@ -53,10 +53,19 @@
 本项目默认在 `.github/workflows/schedule.yml` 中配置了 GitHub 定时任务，对应北京时间 **08:00、12:00、16:00、20:00** 运行。
 
 **💡 进阶技巧：如何保证秒级准时？**
-由于 GitHub 官方的 Cron 触发存在排队延迟（可能延迟 5-30 分钟），追求极致准时的玩家可以：
-1.  在 [cron-job.org](https://cron-job.org/) 创建任务。
-2.  配置 POST 请求通过 GitHub API 远程触发本项目的 `workflow_dispatch`。
-3.  详细教程可参考 [新闻联播文字稿自动化推送系统](https://github.com/ALLCAPS-Droid/xin-wen-lian-bo)。
+由于 GitHub 默认的定时器存在严重延迟，我们使用免费的 [cron-job.org](https://cron-job.org/) 来精准触发。
+
+1. **获取 GitHub Token**：去 GitHub 设置页生成一个 Personal Access Token (Classic)，勾选 `workflow` 权限并复制保存。
+2. **创建定时任务**：在 cron-job.org 创建新任务，设为你需要的时间。
+3. **配置 API 请求**：
+   - **URL**: `https://api.github.com/repos/你的用户名/你的仓库名/actions/workflows/你的 yml 文件名.yml/dispatches`
+   - **Method**: `POST`
+   - **Request Body**: `{"ref":"master"}` *(如果你的默认分支是 main，请改为 main)*
+   - **Headers** :
+     - `Accept`: `application/vnd.github+json`
+     - `Authorization`: `Bearer 你的 Token` *(注意 Bearer 后有空格)*
+     - `Content-Type`: `application/json`
+     - `User-Agent`: `cron-job-org`
 
 ---
 
