@@ -14,7 +14,7 @@
 
 ### 📸 效果预览
 <div align="center">
-  <img src="[【把你刚才拿到的 https://... 网址粘贴在这里】](https://github.com/user-attachments/assets/22d6f77f-7525-439b-a47e-6b93473ef87e)" width="320" alt="手机通知预览" />
+  <img src="https://github.com/user-attachments/assets/22d6f77f-7525-439b-a47e-6b93473ef87e" width="320" alt="手机通知预览" />
   <br>
 </div>
 
