@@ -29,7 +29,7 @@
 
 测试key：sk-ff14f964051a5c966564e29b5bd3a768
 
-项目主页：https://github.com/Entropy-Increase-Team/astrbot_plugin_rocom
+项目主页：[Entropy-Increase-Team/astrbot_plugin_rocom](https://github.com/Entropy-Increase-Team/astrbot_plugin_rocom)
 
 #### 3. 配置 GitHub Secrets (核心步骤)
 进入你的 GitHub 仓库 -> `Settings` -> `Secrets and variables` -> `Actions`，点击 `New repository secret`，依次添加以下 **4 个环境变量**：
