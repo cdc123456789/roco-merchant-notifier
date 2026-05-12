@@ -37,14 +37,12 @@ def get_round_info():
     if now < start_time:
         return {"current": "未开放", "total": 4, "countdown": "尚未开市"}
     
-    # 每 4 小时一轮: 08-12, 12-16, 16-20, 20-00
     delta_seconds = int((now - start_time).total_seconds())
     round_index = (delta_seconds // (4 * 3600)) + 1
     
     if round_index > 4:
         return {"current": 4, "total": 4, "countdown": "今日已收市"}
     
-    # 计算本轮剩余时间
     round_end = start_time + timedelta(hours=round_index * 4)
     remaining = round_end - now
     hours, rem = divmod(int(remaining.total_seconds()), 3600)
@@ -59,34 +57,113 @@ def get_round_info():
     }
 
 def process_data_for_template(data):
-    """清洗接口数据，精准筛选当前轮次商品"""
     if not data: return {}
     
     now_ms = int(get_beijing_time().timestamp() * 1000)
     round_info = get_round_info()
     
-    activities = data.get("merchantActivities") or []
+    activities = data.get("merchantActivities") or data.get("merchant_activities") or []
     activity = activities[0] if activities else {}
-    all_items = (activity.get("get_props") or []) + (activity.get("get_pets") or [])
     
+    # 获取三种类型的商品
+    buckets = [
+        ("道具", activity.get("get_props") or []),
+        ("额外道具", activity.get("get_extra_props") or []),
+        ("精灵", activity.get("get_pets") or []),
+    ]
+
+    # 匹配商品元数据字典 (用于获取价格和限购次数)
+    random_goods = data.get("random_goods") if isinstance(data.get("random_goods"), list) else []
+    goods_meta_by_name = {
+        str(item.get("goods_name", "") or item.get("name", "")).strip(): item
+        for item in random_goods
+        if isinstance(item, dict) and str(item.get("goods_name", "") or item.get("name", "")).strip()
+    }
+
+    all_products = []
     active_products = []
-    for item in all_items:
-        s_time = item.get("start_time")
-        e_time = item.get("end_time")
-        
-        if s_time and e_time:
-            if int(s_time) <= now_ms < int(e_time):
-                active_products.append({
-                    "name": item.get("name", "未知"),
-                    "image": item.get("icon_url", ""),
-                    "time_label": f"{format_timestamp(s_time)} - {format_timestamp(e_time)}"
-                })
-        else:
-            active_products.append({
-                "name": item.get("name", "未知"),
+    
+    for category, items in buckets:
+        for item in items:
+            if not isinstance(item, dict): continue
+
+            goods_meta = goods_meta_by_name.get(str(item.get("name", "")).strip(), {})
+            
+            s_time = item.get("start_time")
+            e_time = item.get("end_time")
+
+            # 兜底继承大活动时间
+            if s_time is None: s_time = activity.get("start_time")
+            if e_time is None: e_time = activity.get("end_time")
+
+            start_ms = int(s_time) if s_time else None
+            end_ms = int(e_time) if e_time else None
+
+            is_active = True
+            if start_ms is not None and end_ms is not None:
+                is_active = start_ms <= now_ms < end_ms
+
+            status_label = "当前轮次"
+            if start_ms is not None and now_ms < start_ms:
+                status_label = "未开始"
+            elif end_ms is not None and now_ms >= end_ms:
+                status_label = "已结束"
+
+            # 时间标签格式化
+            start_str = format_timestamp(start_ms)
+            end_str = format_timestamp(end_ms)
+            if start_str[:5] == end_str[:5] and start_str != "--:--":
+                time_label = f"{start_str} - {end_str[6:]}" if len(end_str) > 6 else f"{start_str} - {end_str}"
+            else:
+                time_label = f"{start_str} - {end_str}"
+
+            product = {
+                "name": item.get("name", "未知商品"),
                 "image": item.get("icon_url", ""),
-                "time_label": "全天供应"
-            })
+                "time_label": time_label,
+                "start_ms": start_ms,
+                "end_ms": end_ms,
+                "is_active": is_active,
+                "status_label": status_label,
+                "price": item.get("price") if item.get("price") not in (None, "") else goods_meta.get("price"),
+                "buy_limit_num": item.get("buy_limit_num") if item.get("buy_limit_num") not in (None, "") else goods_meta.get("buy_limit_num")
+            }
+            
+            all_products.append(product)
+            if is_active:
+                active_products.append(product)
+                
+    # 历史记录分组逻辑
+    today = datetime.fromtimestamp(now_ms / 1000, tz=timezone(timedelta(hours=8))).strftime("%Y-%m-%d")
+    grouped = {}
+    
+    for product in all_products:
+        if product["is_active"]: continue
+        start_ms = product["start_ms"]
+        if not start_ms: continue
+        
+        start_dt = datetime.fromtimestamp(start_ms / 1000, tz=timezone(timedelta(hours=8)))
+        if start_dt.strftime("%Y-%m-%d") != today: continue
+
+        key = f"{start_ms}-{product['end_ms'] or ''}"
+        if key not in grouped:
+            grouped[key] = {
+                "time_label": product["time_label"] or "--:--",
+                "status_label": product["status_label"] or "其他时段",
+                "sort": start_ms,
+                "products": []
+            }
+        group = grouped[key]
+        names = {p["name"] for p in group["products"]}
+        # 每段最多展示5个不重复商品
+        if product["name"] not in names and len(group["products"]) < 5:
+            group["products"].append(product)
+
+    history_groups = [
+        {k: v for k, v in g.items() if k != "sort"}
+        for g in sorted(grouped.values(), key=lambda x: x["sort"])
+        if g["products"]
+    ]
             
     return {
         "title": activity.get("name", "远行商人"),
@@ -94,11 +171,12 @@ def process_data_for_template(data):
         "product_count": len(active_products),
         "round_info": round_info,
         "products": active_products,
+        "history_groups": history_groups, # 喂入历史商品数据
         
-        # --- 为了完美适配最初的原版 index.html 增加的变量 ---
-        "_res_path": "",  # 留空，让 HTML 里的相对路径生效读取本地 ttf 和 img
-        "background": "img/bg.C8CUoi7I.jpg", # 激活原版的背景图
-        "titleIcon": True # 激活原版的 Logo 显示
+        # 本地资源支持变量
+        "_res_path": "",
+        "background": "img/bg.C8CUoi7I.jpg",
+        "titleIcon": True
     }
 
 # ================= 3. 图像渲染与上传 =================
@@ -124,20 +202,19 @@ async def render_to_image(processed_data):
             browser = await p.chromium.launch()
             page = await browser.new_page()
             
-            # --- 避开手机端错乱排版，恢复完美宽度 ---
-            await page.set_viewport_size({"width": 900, "height": 1200})
+            # 维持稳定的 900 宽度，完美规避手机端排版错乱
+            await page.set_viewport_size({"width": 900, "height": 1600})
             await page.goto(f"file://{temp_html_path}")
             
-            # 等待字体加载完成
+            # 等待所有图文加载完毕
             await page.evaluate("document.fonts.ready")
             await page.wait_for_load_state("networkidle")
             
-            # --- 定位原版 HTML 的包裹容器 ---
             data_region = page.locator('.merchant-page')
             await data_region.screenshot(path=screenshot_file, type="jpeg", quality=90)
             
             await browser.close()
-            print(f"✅ 图片渲染成功 (精准切割): {screenshot_file}")
+            print(f"✅ 图片渲染成功: {screenshot_file}")
             return screenshot_file
             
     except Exception as e:
