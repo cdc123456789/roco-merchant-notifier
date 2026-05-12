@@ -12,7 +12,11 @@
   * 🤖 **Android**: 通过 [NotifyMe](https://notifyme.wzn556.top/)  实现高优先级通知推送。
 * **防拥堵机制**：GitHub Actions 定时任务设置“提前 5 分钟”排队策略，有效对抗官方节点延迟。
 
----
+### 📸 效果预览
+<div align="center">
+  <img src="[【把你刚才拿到的 https://... 网址粘贴在这里】](https://github.com/user-attachments/assets/22d6f77f-7525-439b-a47e-6b93473ef87e)" width="320" alt="手机通知预览" />
+  <br>
+</div>
 
 ### 🚀 快速上手
 
