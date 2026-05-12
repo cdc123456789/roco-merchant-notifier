@@ -36,7 +36,7 @@
 
 | Secret 名称 | 必填 | 说明 | 获取方式 |
 | :--- | :---: | :--- | :--- |
-| `ROCOM_API_KEY` | ✅ | 游戏数据接口访问凭证 | 社区网关提供 |
+| `ROCOM_API_KEY` | ✅ | 游戏数据接口访问凭证 | [社区网关](https://github.com/Entropy-Increase-Team/astrbot_plugin_rocom)提供 |
 | `IMGBB_KEY` | ✅ | 图床上传 API Key | 注册 [ImgBB](https://api.imgbb.com/) 获取 |
 | `BARK_KEY` | 选填 | iOS 推送 Key | Bark App 内复制 |
 | `NOTIFYME_UUID` | 选填 | Android 推送 UUID | NotifyMe App 内获取 |
