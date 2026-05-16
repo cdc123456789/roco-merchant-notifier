@@ -1,5 +1,6 @@
-from time_utils import get_beijing_time, format_timestamp, get_round_info
 from datetime import datetime, timedelta, timezone
+from time_utils import get_beijing_time, format_timestamp, get_round_info
+from config import RARE_KEYWORDS
 
 def process_data_for_template(data):
     """将原始 API 数据转换为渲染模板所需的字典"""
@@ -125,7 +126,6 @@ def process_data_for_template(data):
 
 def check_rare_products(products):
     """从活跃商品中识别稀有道具，返回匹配的关键词列表（去重）"""
-    from config import RARE_KEYWORDS
     found = set()
     for p in products:
         name = p.get("name", "")
