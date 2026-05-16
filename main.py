@@ -2,6 +2,7 @@ import os
 import requests
 import asyncio
 import smtplib
+import json
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.image import MIMEImage
@@ -11,8 +12,6 @@ from playwright.async_api import async_playwright
 
 # ================= 1. 配置区域 =================
 ROCOM_API_KEY = os.environ.get("ROCOM_API_KEY")
-NOTIFYME_UUID = os.environ.get("NOTIFYME_UUID")   # 不再使用，可删除
-BARK_KEY = os.environ.get("BARK_KEY")            # 不再使用，可删除
 
 # 邮件配置（必须）
 EMAIL_SMTP_HOST = os.environ.get("EMAIL_SMTP_HOST")
@@ -20,12 +19,15 @@ EMAIL_SMTP_PORT = int(os.environ.get("EMAIL_SMTP_PORT", 465))
 EMAIL_USER = os.environ.get("EMAIL_USER")
 EMAIL_PASSWORD = os.environ.get("EMAIL_PASSWORD")
 EMAIL_FROM = os.environ.get("EMAIL_FROM")
-EMAIL_TO = os.environ.get("EMAIL_TO")            # 支持多个收件人，用逗号分隔
+EMAIL_TO = os.environ.get("EMAIL_TO")
 
 GAME_API_URL = "https://wegame.shallow.ink/api/v1/games/rocom/merchant/info"
 ASSETS_DIR = os.path.abspath("assets/yuanxing-shangren")
 HTML_TEMPLATE_FILE = "index.html"
 TEMP_RENDER_FILE = "temp_render.html"
+
+# 稀有道具关键词
+RARE_KEYWORDS = ["国王球", "棱镜球", "炫彩精灵蛋"]
 
 # ================= 2. 时间与数据处理逻辑 =================
 def get_beijing_time():
@@ -141,7 +143,7 @@ def process_data_for_template(data):
             if is_active:
                 active_products.append(product)
 
-    # 历史记录分组（用于HTML模板，暂不影响邮件）
+    # 历史记录分组（保留用于HTML模板）
     today = datetime.fromtimestamp(now_ms / 1000, tz=timezone(timedelta(hours=8))).strftime("%Y-%m-%d")
     grouped = {}
     for product in all_products:
@@ -184,7 +186,7 @@ def process_data_for_template(data):
         "titleIcon": True
     }
 
-# ================= 3. 图像渲染（仅本地截图） =================
+# ================= 3. 图像渲染 =================
 async def render_to_image(processed_data):
     if not processed_data or processed_data["product_count"] == 0:
         print("当前无活跃商品，跳过渲染")
@@ -222,7 +224,6 @@ async def render_to_image(processed_data):
 
 # ================= 4. 邮件发送 =================
 def send_email(subject, body_text, body_html=None, image_path=None):
-    """发送邮件，可选附带图片附件"""
     if not all([EMAIL_SMTP_HOST, EMAIL_USER, EMAIL_PASSWORD, EMAIL_FROM, EMAIL_TO]):
         print("❌ 邮件配置不完整，无法发送")
         return
@@ -230,18 +231,15 @@ def send_email(subject, body_text, body_html=None, image_path=None):
     msg = MIMEMultipart('alternative')
     msg['Subject'] = subject
     msg['From'] = EMAIL_FROM
-    msg['To'] = EMAIL_TO  # 多个收件人用逗号分隔，MIMEMultipart会自动处理
+    msg['To'] = EMAIL_TO
 
-    # 纯文本版本
     part_text = MIMEText(body_text, 'plain', 'utf-8')
     msg.attach(part_text)
 
-    # HTML 版本（可选）
     if body_html:
         part_html = MIMEText(body_html, 'html', 'utf-8')
         msg.attach(part_html)
 
-    # 附加图片
     if image_path and os.path.exists(image_path):
         with open(image_path, 'rb') as f:
             img_data = f.read()
@@ -249,7 +247,6 @@ def send_email(subject, body_text, body_html=None, image_path=None):
         msg.attach(img_attachment)
 
     try:
-        # 根据端口选择 SSL 或 STARTTLS
         if EMAIL_SMTP_PORT == 465:
             with smtplib.SMTP_SSL(EMAIL_SMTP_HOST, EMAIL_SMTP_PORT) as server:
                 server.login(EMAIL_USER, EMAIL_PASSWORD)
@@ -264,91 +261,20 @@ def send_email(subject, body_text, body_html=None, image_path=None):
         print(f"❌ 邮件发送失败: {e}")
 
 def build_email_content(processed):
-    """从处理后的数据生成邮件正文（纯文本和 HTML）"""
     round_info = processed["round_info"]
     products = processed["products"]
     title = processed["title"]
 
-    # 轮次信息
     if isinstance(round_info["current"], int):
         round_text = f"第 {round_info['current']} / {round_info['total']} 轮"
     else:
         round_text = round_info["current"]
     countdown = round_info["countdown"]
 
-    # 商品列表
     if products:
         items_text = "\n".join(
             f"• {p['name']}（{p.get('category','')}） - 价格：{p.get('price','?')} - 限购：{p.get('buy_limit_num','无')} - 时间：{p['time_label']}"
             for p in products
         )
         items_html = "<ul>" + "".join(
-            f"<li><b>{p['name']}</b>（{p.get('category','')}） - 价格：{p.get('price','?')} - 限购：{p.get('buy_limit_num','无')} - 时间：{p['time_label']}</li>"
-            for p in products
-        ) + "</ul>"
-    else:
-        items_text = "当前暂无商品"
-        items_html = "<p>当前暂无商品</p>"
-
-    # 纯文本正文
-    body_text = f"""【{title}】{round_text}，倒计时 {countdown}
-
-活跃商品：
-{items_text}
-
-截图请见附件。
-"""
-
-    # HTML 正文
-    body_html = f"""
-    <html>
-    <body>
-    <h2>{title}</h2>
-    <p><strong>{round_text}</strong>，倒计时 <strong>{countdown}</strong></p>
-    <h3>活跃商品</h3>
-    {items_html}
-    <p>截图请见附件。</p>
-    </body>
-    </html>
-    """
-    return body_text, body_html
-
-# ================= 5. 主入口 =================
-async def main():
-    try:
-        resp = requests.get(GAME_API_URL, headers={"X-API-Key": ROCOM_API_KEY}, timeout=30)
-        resp.raise_for_status()
-        raw_data = resp.json().get("data", {})
-        err = None if resp.json().get("code") == 0 else resp.json().get("message")
-    except Exception as e:
-        raw_data, err = None, f"请求异常: {e}"
-
-    if err or not raw_data:
-        subject = "⚠️ 远行商人监控异常"
-        body = f"无法获取数据：{err or '未知错误'}"
-        send_email(subject, body, f"<p>{body}</p>", None)
-        return
-
-    processed = process_data_for_template(raw_data)
-    if processed["product_count"] == 0:
-        print("无活跃商品，发送无商品邮件")
-        subject = "📢 远行商人已刷新（无商品）"
-        body_text, body_html = build_email_content(processed)
-        send_email(subject, body_text, body_html, None)
-        return
-
-    # 渲染截图
-    local_img = await render_to_image(processed)
-
-    # 生成邮件内容并发送
-    subject = "📢 远行商人已刷新"
-    body_text, body_html = build_email_content(processed)
-    send_email(subject, body_text, body_html, local_img)
-
-    # 清理本地截图
-    if local_img and os.path.exists(local_img):
-        os.remove(local_img)
-        print(f"🗑️ 已删除临时截图 {local_img}")
-
-if __name__ == "__main__":
-    asyncio.run(main())
+ 
