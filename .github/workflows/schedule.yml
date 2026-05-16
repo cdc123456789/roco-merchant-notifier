@@ -19,25 +19,25 @@ jobs:
         with:
           python-version: '3.10'
 
-      # 缓存 pip 依赖包
-      - name: Cache pip packages
-        uses: actions/cache@v3
-        id: pip-cache
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
+      # # 缓存 pip 依赖包
+      # - name: Cache pip packages
+      #   uses: actions/cache@v3
+      #   id: pip-cache
+      #   with:
+      #     path: ~/.cache/pip
+      #     key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+      #     restore-keys: |
+      #       ${{ runner.os }}-pip-
 
-      # 缓存 Playwright 浏览器（约170MB）
-      - name: Cache Playwright browsers
-        uses: actions/cache@v3
-        id: playwright-cache
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ hashFiles('requirements.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-playwright-
+      # # 缓存 Playwright 浏览器（约170MB）
+      # - name: Cache Playwright browsers
+      #   uses: actions/cache@v3
+      #   id: playwright-cache
+      #   with:
+      #     path: ~/.cache/ms-playwright
+      #     key: ${{ runner.os }}-playwright-${{ hashFiles('requirements.txt') }}
+      #     restore-keys: |
+      #       ${{ runner.os }}-playwright-
 
       - name: Install Python dependencies
         run: |
@@ -46,8 +46,6 @@ jobs:
 
       - name: Install Playwright browsers & system deps
         run: |
-          # 如果浏览器缓存命中，此步骤会瞬间完成（仅验证）
-          # 依然需要安装系统依赖（中文字体等）
           playwright install chromium --with-deps
           sudo apt-get update
           sudo apt-get install -y fonts-wqy-zenhei
