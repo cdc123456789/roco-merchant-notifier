@@ -277,4 +277,98 @@ def build_email_content(processed):
             for p in products
         )
         items_html = "<ul>" + "".join(
- 
+            f"<li><b>{p['name']}</b>（{p.get('category','')}） - 价格：{p.get('price','?')} - 限购：{p.get('buy_limit_num','无')} - 时间：{p['time_label']}</li>"
+            for p in products
+        ) + "</ul>"
+    else:
+        items_text = "当前暂无商品"
+        items_html = "<p>当前暂无商品</p>"
+
+    body_text = f"""【{title}】{round_text}，倒计时 {countdown}
+
+活跃商品：
+{items_text}
+
+截图请见附件。
+"""
+
+    body_html = f"""
+    <html>
+    <body>
+    <h2>{title}</h2>
+    <p><strong>{round_text}</strong>，倒计时 <strong>{countdown}</strong></p>
+    <h3>活跃商品</h3>
+    {items_html}
+    <p>截图请见附件。</p>
+    </body>
+    </html>
+    """
+    return body_text, body_html
+
+# ================= 5. 辅助：检查稀有物品 =================
+def check_rare_products(products):
+    """从活跃商品中识别稀有道具，返回匹配的关键词列表（去重）"""
+    found = set()
+    for p in products:
+        name = p.get("name", "")
+        for kw in RARE_KEYWORDS:
+            if kw in name:
+                found.add(kw)
+    return list(found)
+
+def build_rare_suffix(rare_list):
+    """根据稀有道具列表生成邮件标题后缀"""
+    if not rare_list:
+        return ""
+    # 例如 ['国王球', '炫彩精灵蛋'] -> "【内含国王球/炫彩精灵蛋】"
+    rare_str = "/".join(rare_list)
+    return f"【内含{rare_str}】"
+
+# ================= 6. 主入口 =================
+async def main():
+    try:
+        resp = requests.get(GAME_API_URL, headers={"X-API-Key": ROCOM_API_KEY}, timeout=30)
+        resp.raise_for_status()
+        response_json = resp.json()
+        raw_data = response_json.get("data", {})
+        err = None if response_json.get("code") == 0 else response_json.get("message")
+
+        print("\n========== API 原始响应 JSON ==========")
+        print(json.dumps(response_json, indent=2, ensure_ascii=False))
+        print("========================================\n")
+
+    except Exception as e:
+        raw_data, err = None, f"请求异常: {e}"
+        print(f"❌ 请求失败: {err}")
+
+    if err or not raw_data:
+        subject = "⚠️ 远行商人监控异常"
+        body = f"无法获取数据：{err or '未知错误'}"
+        send_email(subject, body, f"<p>{body}</p>", None)
+        return
+
+    processed = process_data_for_template(raw_data)
+
+    # 检查活跃商品中是否有稀有道具
+    rare_items = check_rare_products(processed.get("products", []))
+    rare_suffix = build_rare_suffix(rare_items)
+
+    if processed["product_count"] == 0:
+        print("无活跃商品，发送无商品邮件")
+        subject = f"📢 远行商人已刷新（无商品）{rare_suffix}"
+        body_text, body_html = build_email_content(processed)
+        send_email(subject, body_text, body_html, None)
+        return
+
+    local_img = await render_to_image(processed)
+    # 根据是否有稀有道具构造标题
+    subject = f"📢 远行商人已刷新{rare_suffix}"
+    body_text, body_html = build_email_content(processed)
+    send_email(subject, body_text, body_html, local_img)
+
+    if local_img and os.path.exists(local_img):
+        os.remove(local_img)
+        print(f"🗑️ 已删除临时截图 {local_img}")
+
+if __name__ == "__main__":
+    asyncio.run(main())
