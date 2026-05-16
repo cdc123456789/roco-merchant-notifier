@@ -1,4 +1,5 @@
 import smtplib
+import os
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.image import MIMEImage
@@ -43,7 +44,7 @@ def send_email(subject, body_text, body_html=None, image_path=None):
         print(f"❌ 邮件发送失败: {e}")
 
 def build_email_content(processed):
-    """从 processed 数据生成纯文本和 HTML 邮件正文"""
+    """从 processed 数据生成纯文本和 HTML 邮件正文（已修复括号语法）"""
     round_info = processed["round_info"]
     products = processed["products"]
     title = processed["title"]
@@ -55,14 +56,14 @@ def build_email_content(processed):
     countdown = round_info["countdown"]
 
     if products:
-        items_text = "\n".join(
-            f"• {p['name']}（{p.get('category','')}） - 价格：{p.get('price','?')} - 限购：{p.get('buy_limit_num','无')} - 时间：{p['time_label']}"
-            for p in products
-        )
-        items_html = "<ul>" + "".join(
-            f"<li><b>{p['name']}</b>（{p.get('category','')}） - 价格：{p.get('price','?')} - 限购：{p.get('buy_limit_num','无')} - 时间：{p['time_label']}</li>"
-            for p in products
-        ) + "</ul>"
+        items_text_lines = []
+        items_html_lines = []
+        for p in products:
+            line = f"• {p['name']}（{p.get('category','')}） - 价格：{p.get('price','?')} - 限购：{p.get('buy_limit_num','无')} - 时间：{p['time_label']}"
+            items_text_lines.append(line)
+            items_html_lines.append(f"<li><b>{p['name']}</b>（{p.get('category','')}） - 价格：{p.get('price','?')} - 限购：{p.get('buy_limit_num','无')} - 时间：{p['time_label']}</li>")
+        items_text = "\n".join(items_text_lines)
+        items_html = "<ul>" + "".join(items_html_lines) + "</ul>"
     else:
         items_text = "当前暂无商品"
         items_html = "<p>当前暂无商品</p>"
