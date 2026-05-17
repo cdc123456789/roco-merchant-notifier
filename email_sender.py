@@ -53,44 +53,50 @@ def build_email_content(processed):
     """
     return body_text, body_html
 
-# ================= 邮件发送（图片内嵌版）=================
+# ================= 邮件发送（确保 HTML 正文 + 图片内嵌）=================
 def send_email(subject, body_text, body_html=None, image_path=None):
     """
-    发送邮件，如果提供 image_path 且 body_html 存在，则将图片内嵌到 HTML 尾部。
-    保持原有参数不变。
+    发送邮件。如果提供 image_path 且 body_html 存在，则将图片内嵌到 HTML 尾部。
+    参数签名保持不变。
     """
     if not all([EMAIL_SMTP_HOST, EMAIL_USER, EMAIL_PASSWORD, EMAIL_FROM, EMAIL_TO]):
         print("❌ 邮件配置不完整，无法发送")
         return
 
-    # 选择容器类型：有内嵌图片时用 'related'，否则用 'alternative'
+    # 根容器：如果需要内嵌图片，使用 related；否则用 alternative
     if body_html and image_path and os.path.exists(image_path):
-        msg = MIMEMultipart('related')
+        # 有图片：根 MIME 类型为 related，内部包含 alternative 和 图片
+        root = MIMEMultipart('related')
+        # 创建 alternative 子容器，用于纯文本和 HTML 正文
+        alt = MIMEMultipart('alternative')
+        root.attach(alt)
     else:
-        msg = MIMEMultipart('alternative')
+        # 无图片：直接使用 alternative 作为根
+        root = MIMEMultipart('alternative')
+        alt = root  # 别名，方便后面统一处理
 
-    msg['Subject'] = subject
-    msg['From'] = EMAIL_FROM
-    msg['To'] = EMAIL_TO
+    root['Subject'] = subject
+    root['From'] = EMAIL_FROM
+    root['To'] = EMAIL_TO
 
-    # 纯文本部分
+    # 添加纯文本部分
     part_text = MIMEText(body_text, 'plain', 'utf-8')
-    msg.attach(part_text)
+    alt.attach(part_text)
 
-    # 处理 HTML 与内嵌图片
+    # 添加 HTML 部分（可能被修改以包含图片引用）
     if body_html:
         final_html = body_html
         if image_path and os.path.exists(image_path):
+            # 读取图片数据
             with open(image_path, 'rb') as f:
                 img_data = f.read()
-            cid = make_msgid(domain='merchant')
-            # 去掉 cid 字符串两边的尖括号，以便直接插入 src="cid:xxx"
-            cid_clean = cid[1:-1] if cid.startswith('<') and cid.endswith('>') else cid
-            # 在 HTML 尾部（</body> 前）插入图片标签
+            # 生成唯一 Content-ID（不带尖括号，用于引用）
+            cid = make_msgid(domain='merchant')[1:-1]  # 去掉 <>
+            # 在 HTML 尾部添加图片标签
             img_tag = (
                 '<br><br>'
                 '<div style="text-align: center;">'
-                f'<img src="cid:{cid_clean}" alt="商品截图" style="max-width: 100%; border: 1px solid #ccc;">'
+                f'<img src="cid:{cid}" alt="商品截图" style="max-width: 100%; border: 1px solid #ccc;">'
                 '<br><span style="color: #666; font-size: 12px;">📸 远行商人商品截图</span>'
                 '</div>'
             )
@@ -99,26 +105,26 @@ def send_email(subject, body_text, body_html=None, image_path=None):
             else:
                 final_html = final_html + img_tag
 
-            # 附加内嵌图片
+            # 附加图片作为内嵌资源（需要放在 root 下，即与 alt 同级）
             img_part = MIMEImage(img_data, name=os.path.basename(image_path))
-            img_part.add_header('Content-ID', cid)
+            img_part.add_header('Content-ID', f'<{cid}>')
             img_part.add_header('Content-Disposition', 'inline', filename=os.path.basename(image_path))
-            msg.attach(img_part)
+            root.attach(img_part)
 
         part_html = MIMEText(final_html, 'html', 'utf-8')
-        msg.attach(part_html)
+        alt.attach(part_html)
 
-    # 发送邮件
+    # 发送邮件（根容器为 root）
     try:
         if EMAIL_SMTP_PORT == 465:
             with smtplib.SMTP_SSL(EMAIL_SMTP_HOST, EMAIL_SMTP_PORT) as server:
                 server.login(EMAIL_USER, EMAIL_PASSWORD)
-                server.send_message(msg)
+                server.send_message(root)
         else:
             with smtplib.SMTP(EMAIL_SMTP_HOST, EMAIL_SMTP_PORT) as server:
                 server.starttls()
                 server.login(EMAIL_USER, EMAIL_PASSWORD)
-                server.send_message(msg)
+                server.send_message(root)
         print("✅ 邮件发送成功")
     except Exception as e:
         print(f"❌ 邮件发送失败: {e}")
