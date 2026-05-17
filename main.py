@@ -24,7 +24,7 @@ async def main():
         print("========================================\n")
 
     except Exception as e:
-        raw_data, err = None, f"请求异常: {e}"
+        raw_data, err = None, f"请求异常: {e}, 请去https://github.com/cdc123456789/roco-merchant-notifier/actions重试"
         print(f"❌ 请求失败: {err}")
 
     # 2. 错误处理：发送异常通知邮件
