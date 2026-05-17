@@ -50,16 +50,19 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y fonts-wqy-zenhei
           
-      - name: Run Notifier Script
-        env:
-          # 游戏 API 密钥（必需）
-          ROCOM_API_KEY: ${{ secrets.ROCOM_API_KEY }}
-          
-          # 邮件配置（全部必需）
-          EMAIL_SMTP_HOST: "smtp.qq.com"
-          EMAIL_SMTP_PORT: "465"
-          EMAIL_USER: ${{ secrets.EMAIL_USER }}
-          EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
-          EMAIL_FROM: ${{ secrets.EMAIL_USER }}
-          EMAIL_TO: ${{ secrets.EMAIL_TO }}
-        run: python main.py
+      - name: Run Notifier Script with Retry
+        uses: nick-fields/retry@v2
+        with:
+          timeout_minutes: 10
+          max_attempts: 3
+          retry_on: error
+          retry_wait_seconds: 60
+          command: python main.py
+          env: |
+            ROCOM_API_KEY=${{ secrets.ROCOM_API_KEY }}
+            EMAIL_SMTP_HOST=smtp.qq.com
+            EMAIL_SMTP_PORT=465
+            EMAIL_USER=${{ secrets.EMAIL_USER }}
+            EMAIL_PASSWORD=${{ secrets.EMAIL_PASSWORD }}
+            EMAIL_FROM=${{ secrets.EMAIL_USER }}
+            EMAIL_TO=${{ secrets.EMAIL_TO }}
