@@ -6,7 +6,7 @@ from email.mime.image import MIMEImage
 from email.utils import make_msgid
 from config import EMAIL_SMTP_HOST, EMAIL_SMTP_PORT, EMAIL_USER, EMAIL_PASSWORD, EMAIL_FROM, EMAIL_TO
 
-def send_email(subject, body_text, body_html=None, image_path=None):
+def build_email_content(subject, body_text, body_html=None, image_path=None):
     """发送邮件，可选择将图片内嵌到HTML正文尾部"""
     if not all([EMAIL_SMTP_HOST, EMAIL_USER, EMAIL_PASSWORD, EMAIL_FROM, EMAIL_TO]):
         print("❌ 邮件配置不完整，无法发送")
