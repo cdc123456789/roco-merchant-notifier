@@ -1,4 +1,5 @@
 import os
+import sys
 import requests
 import asyncio
 import json
@@ -31,7 +32,7 @@ async def main():
         subject = "⚠️ 远行商人监控异常"
         body = f"无法获取数据：{err or '未知错误'}"
         send_email(subject, body, f"<p>{body}</p>", None)
-        return
+        sys.exit(1)
 
     # 3. 处理数据
     processed = process_data_for_template(raw_data)
