@@ -57,12 +57,12 @@ jobs:
           max_attempts: 3
           retry_on: error
           retry_wait_seconds: 60
-          command: python main.py
-          env: |
-            ROCOM_API_KEY=${{ secrets.ROCOM_API_KEY }}
-            EMAIL_SMTP_HOST=smtp.qq.com
-            EMAIL_SMTP_PORT=465
-            EMAIL_USER=${{ secrets.EMAIL_USER }}
-            EMAIL_PASSWORD=${{ secrets.EMAIL_PASSWORD }}
-            EMAIL_FROM=${{ secrets.EMAIL_USER }}
-            EMAIL_TO=${{ secrets.EMAIL_TO }}
+          command: |
+            export ROCOM_API_KEY=${{ secrets.ROCOM_API_KEY }}
+            export EMAIL_SMTP_HOST="smtp.qq.com"
+            export EMAIL_SMTP_PORT="465"
+            export EMAIL_USER=${{ secrets.EMAIL_USER }}
+            export EMAIL_PASSWORD=${{ secrets.EMAIL_PASSWORD }}
+            export EMAIL_FROM=${{ secrets.EMAIL_USER }}
+            export EMAIL_TO=${{ secrets.EMAIL_TO }}
+            python main.py
